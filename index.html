@@ -47,6 +47,18 @@
 <script src="data.js?v=202611202217"></script>
 <script src="news.js?v=1"></script>
 <script src="circuits.js?v=1"></script>
-<script src="app.js?v=24"></script>
+<script src="app.js?v=25"></script>
+<script>
+/* aggiornamento automatico: se online c'è una versione più nuova di app.js o dei dati, ricarica (utile per l'app sulla schermata Home) */
+(function () {
+  const ver = s => (s.match(/(?:app|data|news)\.js\?v=[0-9A-Za-z]+/g) || []).join("|");
+  const mine = ver(document.documentElement.innerHTML);
+  async function check() {
+    try { const r = await fetch("index.html?check=" + Date.now(), {cache: "no-store"}); const t = await r.text(); const v = ver(t);
+      if (v && mine && v !== mine && sessionStorage.getItem("bg_reloaded") !== v) { sessionStorage.setItem("bg_reloaded", v); location.replace(location.pathname + "?v=" + Date.now() + location.hash); } } catch (e) {}
+  }
+  check(); document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });
+})();
+</script>
 </body>
 </html>
