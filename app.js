@@ -512,7 +512,7 @@ function pronHomeHTML(r) {
     return `<div class="pronrow"><div class="grow"><b>${KIND[k]}</b><div class="small" style="opacity:.8">${open ? 'aperto fino a ' + fmtDate(at, {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : 'chiuso'}</div></div>
       <div class="pronpicks">${p ? p.p.map(d => `<span class="mini">${D[d] ? esc(D[d].code) : '?'}</span>`).join('') : `<span class="chip ${open ? 'next' : ''}">${open ? 'Fai il pronostico' : '—'}</span>`}</div></div>`; }).join('') + (PR.code ? '' : '<div class="small" style="opacity:.75;margin-top:8px">Crea il tuo profilo con un nome: ricevi un codice per usarlo su tutti i tuoi dispositivi.</div>');
 }
-async function loadMe() { if (!PR.code || !API) return null; try { PR.me = await api('/me?code=' + encodeURIComponent(PR.code)); } catch (e) { if (/non trovato/i.test(e.message)) PR.code = ''; PR.me = null; } return PR.me; }
+async function loadMe() { PR.err = ""; if (!PR.code || !API) return null; try { PR.me = await api("/me?code=" + encodeURIComponent(PR.code)); } catch (e) { const nf = /non trovato/i.test(e.message); if (nf) PR.code = ""; PR.me = null; PR.err = nf ? "Codice non trovato" : "Server dei pronostici non raggiungibile: riprova tra qualche minuto"; } return PR.me; }
 function pronSheet(round) {
   const r = F.races.find(x => x.round == round) || nextRace; let kind = (lockAt(r, 'q') && Date.now() < lockAt(r, 'q')) ? 'q' : 'r', sel = [];
   openSheet(`<div class="dhero" style="background:linear-gradient(160deg,#3a0d0c,#0b0b0e);min-height:170px"><div class="meta" style="max-width:100%"><div class="small" style="opacity:.75">${gpFlag(r)} Round ${r.round}</div><h2>Pronostici</h2><div class="first">${gpName(r)}</div></div></div>
@@ -524,7 +524,7 @@ function pronSheet(round) {
       <div class="prform"><input id="prNick" maxlength="20" placeholder="Il tuo nome" autocomplete="nickname"><button class="btn" id="prNew">Crea</button></div>
       <div class="small muted" style="margin:14px 0 6px">Hai già un codice?</div><div class="prform"><input id="prCode" maxlength="9" placeholder="ABCD-1234" style="text-transform:uppercase" autocomplete="off"><button class="btn sec" id="prLogin">Entra</button></div><div id="prErr" class="small" style="color:var(--accent);margin-top:8px"></div></div>`;
     $('#prNew').onclick = async () => { try { const j = await api('/player', {nick: $('#prNick').value}); PR.code = j.code; await loadMe(); main(true); } catch (e) { $('#prErr').textContent = e.message; } };
-    $('#prLogin').onclick = async () => { PR.code = $('#prCode').value.trim().toUpperCase(); if (await loadMe()) main(); else $('#prErr').textContent = 'Codice non trovato'; }; };
+    $('#prLogin').onclick = async () => { PR.code = $('#prCode').value.trim().toUpperCase(); if (await loadMe()) main(); else $('#prErr').textContent = PR.err || 'Codice non trovato'; }; };
   const main = (fresh) => { const at = lockAt(r, kind), open = at && Date.now() < at, saved = (PR.me.picks || {})[r.round + kind];
     if (!sel.length && saved) sel = saved.p.slice();
     const top = actualTop3(r.round, kind), pts = saved ? scorePick(saved.p, top) : null;
