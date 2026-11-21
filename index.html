@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brick Grid F1</title>
+<meta name="description" content="Campionato F1 2026 raccontato con minifig e auto LEGO Speed Champions">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Brick Grid">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css?v=11">
+</head>
+<body>
+<div id="app">
+  <header class="topbar" id="topbar"><span id="topTitle"></span></header>
+  <main id="view"></main>
+</div>
+
+<nav class="tabbar glass" id="tabbar" aria-label="Sezioni">
+  <button data-tab="home" class="on"><svg viewBox="0 0 24 24"><path d="M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
+  <button data-tab="standings"><svg viewBox="0 0 24 24"><path d="M3 20h18v1.5H3zM4.5 12h4v7h-4zM10 6h4v13h-4zM15.5 9h4v10h-4z"/></svg><span>Classifiche</span></button>
+  <button data-tab="races"><svg viewBox="0 0 24 24"><path d="M5 3h1.6v18H5zM7.5 4h12l-2.4 4 2.4 4h-12z"/></svg><span>Gare</span></button>
+  <button data-tab="tracks"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7zm0 4.3A2.7 2.7 0 1 0 12 11.7 2.7 2.7 0 0 0 12 6.3z"/></svg><span>Piste</span></button>
+  <button data-tab="me"><svg viewBox="0 0 24 24"><path d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/></svg><span>Preferito</span></button>
+</nav>
+
+<div class="sheet-wrap" id="sheetWrap" aria-hidden="true">
+  <div class="sheet-dim" id="sheetDim"></div>
+  <section class="sheet" id="sheet" role="dialog" aria-modal="true">
+    <div class="grabber"></div>
+    <button class="sheet-close glass" id="sheetClose" aria-label="Chiudi">✕</button>
+    <div class="sheet-body" id="sheetBody"></div>
+  </section>
+</div>
+
+<script src="data.js?v=11"></script>
+<script src="app.js?v=11"></script>
+</body>
+</html>
