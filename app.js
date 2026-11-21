@@ -154,7 +154,7 @@ addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
   sh.addEventListener('touchmove', e => { if (y0 === null) return; const dy = e.touches[0].clientY - y0; if (dy > 0) { sh.style.transition = 'none'; sh.style.transform = `translateY(${dy}px)`; } }, {passive: true});
   sh.addEventListener('touchend', e => { if (y0 === null) return; const dy = e.changedTouches[0].clientY - y0; sh.style.transition = ''; sh.style.transform = ''; if (dy > 120) closeSheet(); y0 = null; });
 })();
-function open(k, v) { ({driver: driverSheet, team: teamSheet, race: raceSheet, track: trackSheet})[k]?.(v); }
+function open(k, v) { ({driver: driverSheet, team: teamSheet, race: raceSheet, track: trackSheet, pron: pronSheet})[k]?.(v); }
 
 /* ---------- componenti ---------- */
 function podiumHTML(r) {
@@ -235,7 +235,9 @@ function home() {
     <div id="nextQuali"></div>
   </div>
   ${GRIDIMG[nextRace.round] ? `<div class="sec-h"><h2>Griglia di partenza</h2><span class="small muted">tocca per ingrandire</span></div>
-  <div class="gridimgs">${GRIDIMG[nextRace.round].map((src, i) => `<button class="gridimg tap" data-grid="${nextRace.round}:${i}"><img src="${src}" alt="Griglia di partenza ${gpName(nextRace)}, posizioni ${i ? '11–22' : '1–10'}" loading="lazy"><span>${i ? '11 – 22' : '1 – 10'}</span></button>`).join('')}</div>` : ''}` : ''}
+  <div class="gridimgs">${GRIDIMG[nextRace.round].map((src, i) => `<button class="gridimg tap" data-grid="${nextRace.round}:${i}"><img src="${src}" alt="Griglia di partenza ${gpName(nextRace)}, posizioni ${i ? '11–22' : '1–10'}" loading="lazy"><span>${i ? '11 – 22' : '1 – 10'}</span></button>`).join('')}</div>` : ''}
+  ${API ? `<div class="sec-h"><h2>Pronostici</h2><button data-open="pron:${nextRace.round}">Classifica</button></div>
+  <div class="card pad tap pronhome" data-open="pron:${nextRace.round}" id="pronHome">${pronHomeHTML(nextRace)}</div>` : ''}` : ''}
 
   <div class="sec-h"><h2>News F1</h2><button id="newsAll">Tutte</button></div>
   <div class="list" id="newsHome">${newsList(newsItems().slice(0, 5))}</div>
@@ -254,6 +256,7 @@ function home() {
   if (target) runCountdown('cdHome', target);
   if (nextRace) liveQuali(nextRace).then(q => { const el = $('#nextQuali'); if (el && q && q.length) el.innerHTML = qualiTop3(q); });
   $('#newsAll').onclick = newsSheet;
+  if (API && nextRace) loadMe().then(() => { const h = $('#pronHome'); if (h) h.innerHTML = pronHomeHTML(nextRace); });
   liveNews().then(ok => { const el = $('#newsHome'); if (ok && el) el.innerHTML = newsList(newsItems().slice(0, 5)); });
   // carosello 3D delle 11 squadre, in ordine di classifica costruttori (gira da solo: pausa + scatto)
   const tids = lastCStand.map(s => s[0]); let shownT = tids[0];
@@ -484,6 +487,71 @@ function newsSheet() {
     <p class="foot">Titoli e link da Motorsport.com, FormulaPassion e Formula1.com: tocca una notizia per leggerla sul sito della fonte.</p>`);
 }
 
+/* ---------- PRONOSTICI (qualifica e gara) — salvati sul Worker Cloudflare, chiusi lato server all'inizio della sessione ---------- */
+const PR = {
+  get code() { try { return localStorage.getItem('bg_code') || ''; } catch { return ''; } },
+  set code(v) { try { v ? localStorage.setItem('bg_code', v) : localStorage.removeItem('bg_code'); } catch {} },
+  me: null, board: null
+};
+async function api(path, body) {
+  const r = await fetch(API + path, body ? {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body)} : {});
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Errore ' + r.status); return j;
+}
+const lockAt = (r, k) => k === 'q' ? (r.sessions.Qualifying ? when(r.sessions.Qualifying[0], r.sessions.Qualifying[1]) : null) : when(r.date, r.time);
+const KIND = {q: 'Qualifica', r: 'Gara'};
+// punti: 5 per ogni posizione esatta, 2 per un pilota nei primi 3 ma in un'altra posizione
+function actualTop3(round, k) { const r = F.races.find(x => x.round == round); if (!r) return null;
+  const list = k === 'q' ? (r.quali.length ? r.quali : LIVEQ[round] || []) : r.results; return list.length >= 3 ? list.slice(0, 3).map(x => x.d) : null; }
+function scorePick(picks, top) { if (!top) return null; return picks.reduce((s, d, i) => s + (top[i] === d ? 5 : top.includes(d) ? 2 : 0), 0); }
+function pickPool(r) { // piloti da scegliere: ordine delle qualifiche se ci sono, altrimenti dell'ultima classifica
+  const q = LIVEQ[r.round] || r.quali; const ids = (q && q.length ? q.map(x => x.d) : lastStand.map(s => s[0]));
+  return [...new Set(ids.concat(lastRace.results.map(x => x.d)))].filter(id => D[id]); }
+function pronHomeHTML(r) {
+  const now = Date.now(), mine = PR.me && PR.me.picks || {};
+  return ['q', 'r'].map(k => { const at = lockAt(r, k), open = at && now < at, p = mine[r.round + k];
+    return `<div class="pronrow"><div class="grow"><b>${KIND[k]}</b><div class="small" style="opacity:.8">${open ? 'aperto fino a ' + fmtDate(at, {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : 'chiuso'}</div></div>
+      <div class="pronpicks">${p ? p.p.map(d => `<span class="mini">${D[d] ? esc(D[d].code) : '?'}</span>`).join('') : `<span class="chip ${open ? 'next' : ''}">${open ? 'Fai il pronostico' : '—'}</span>`}</div></div>`; }).join('') + (PR.code ? '' : '<div class="small" style="opacity:.75;margin-top:8px">Crea il tuo profilo con un nome: ricevi un codice per usarlo su tutti i tuoi dispositivi.</div>');
+}
+async function loadMe() { if (!PR.code || !API) return null; try { PR.me = await api('/me?code=' + encodeURIComponent(PR.code)); } catch (e) { if (/non trovato/i.test(e.message)) PR.code = ''; PR.me = null; } return PR.me; }
+function pronSheet(round) {
+  const r = F.races.find(x => x.round == round) || nextRace; let kind = (lockAt(r, 'q') && Date.now() < lockAt(r, 'q')) ? 'q' : 'r', sel = [];
+  openSheet(`<div class="dhero" style="background:linear-gradient(160deg,#3a0d0c,#0b0b0e);min-height:170px"><div class="meta" style="max-width:100%"><div class="small" style="opacity:.75">${gpFlag(r)} Round ${r.round}</div><h2>Pronostici</h2><div class="first">${gpName(r)}</div></div></div>
+    <div id="prBody"><p class="muted" style="margin-top:16px">Caricamento…</p></div>
+    <div class="sec-h"><h2>Classifica</h2><span class="small muted">5 punti posizione esatta · 2 sul podio</span></div><div id="prBoard" class="list"><div class="li muted">Caricamento…</div></div>
+    <p class="foot">I pronostici si chiudono all'inizio della sessione; quelli degli altri giocatori diventano visibili solo dopo la chiusura.</p>`);
+  const body = () => $("#prBody") || document.createElement("div");
+  const profile = () => { body().innerHTML = `<div class="card pad" style="margin-top:14px"><b>Crea il tuo profilo</b><div class="small muted" style="margin:4px 0 10px">Scegli un nome da mostrare in classifica. Riceverai un codice personale per ritrovare i tuoi pronostici su ogni dispositivo.</div>
+      <div class="prform"><input id="prNick" maxlength="20" placeholder="Il tuo nome" autocomplete="nickname"><button class="btn" id="prNew">Crea</button></div>
+      <div class="small muted" style="margin:14px 0 6px">Hai già un codice?</div><div class="prform"><input id="prCode" maxlength="9" placeholder="ABCD-1234" style="text-transform:uppercase" autocomplete="off"><button class="btn sec" id="prLogin">Entra</button></div><div id="prErr" class="small" style="color:var(--accent);margin-top:8px"></div></div>`;
+    $('#prNew').onclick = async () => { try { const j = await api('/player', {nick: $('#prNick').value}); PR.code = j.code; await loadMe(); main(true); } catch (e) { $('#prErr').textContent = e.message; } };
+    $('#prLogin').onclick = async () => { PR.code = $('#prCode').value.trim().toUpperCase(); if (await loadMe()) main(); else $('#prErr').textContent = 'Codice non trovato'; }; };
+  const main = (fresh) => { const at = lockAt(r, kind), open = at && Date.now() < at, saved = (PR.me.picks || {})[r.round + kind];
+    if (!sel.length && saved) sel = saved.p.slice();
+    const top = actualTop3(r.round, kind), pts = saved ? scorePick(saved.p, top) : null;
+    body().innerHTML = `<div class="prme"><div><div class="small muted">Giocatore</div><b>${esc(PR.me.nick)}</b></div><button class="badge" id="prShow">${fresh ? 'Il tuo codice: ' + esc(PR.code) : 'Mostra codice'}</button></div>
+      ${fresh ? '<div class="small" style="margin:6px 4px 0;color:var(--accent)">Salva questo codice: ti serve per entrare dagli altri dispositivi.</div>' : ''}
+      <div class="seg" id="prSeg"><span class="knob"></span><button data-k="q">Qualifica</button><button data-k="r">Gara</button></div>
+      <div class="small muted" style="margin:-6px 4px 10px">${open ? `Si chiude ${fmtDate(at, {weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'})}` : 'Pronostico chiuso'}${pts != null ? ` · <b style="color:var(--gold)">${pts} punti</b>` : ''}</div>
+      <div class="prslots">${[0, 1, 2].map(i => { const d = sel[i]; const ok = top && d && (top[i] === d ? 'ok' : top.includes(d) ? 'half' : 'no');
+        return `<button class="prslot p${i + 1} ${ok || ''}" data-slot="${i}" ${open ? '' : 'disabled'}><span class="pos">P${i + 1}</span>${d ? `<div class="av" style="width:52px;height:52px">${figFor(d)}</div><b>${esc(D[d].last)}</b>` : '<div class="prempty">+</div><b class="muted">scegli</b>'}</button>`; }).join('')}</div>
+      ${top ? `<div class="small muted" style="margin:8px 4px">Risultato: ${top.map((d, i) => 'P' + (i + 1) + ' ' + esc(D[d] ? D[d].last : d)).join(' · ')}</div>` : ''}
+      ${open ? `<div class="prpool">${pickPool(r).map(id => `<button class="prd ${sel.includes(id) ? 'on' : ''}" data-d="${id}"><div class="av" style="width:44px;height:44px">${figFor(id)}</div><span>${esc(D[id].code)}</span></button>`).join('')}</div>
+      <button class="btn" id="prSave" style="width:100%;margin-top:12px" ${sel.length === 3 ? '' : 'disabled'}>${saved ? 'Aggiorna il pronostico' : 'Salva il pronostico'}</button><div id="prMsg" class="small" style="margin-top:8px;text-align:center"></div>` : ''}`;
+    const seg = $('#prSeg'), knob = seg.querySelector('.knob'), bs = [...seg.querySelectorAll('button')];
+    const place = () => { const b = bs.find(x => x.dataset.k === kind); knob.style.width = b.offsetWidth + 'px'; knob.style.transform = `translateX(${b.offsetLeft - 2}px)`; }; setTimeout(place, 50);
+    bs.forEach(b => b.onclick = () => { if (kind === b.dataset.k) return; kind = b.dataset.k; sel = []; main(); });
+    $('#prShow').onclick = e => { e.currentTarget.textContent = 'Il tuo codice: ' + PR.code; };
+    document.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => { sel.splice(+b.dataset.slot, 1); main(); });
+    document.querySelectorAll('.prd').forEach(b => b.onclick = () => { const d = b.dataset.d; if (sel.includes(d)) sel = sel.filter(x => x !== d); else if (sel.length < 3) sel.push(d); main(); });
+    $('#prSave') && ($('#prSave').onclick = async () => { $('#prSave').disabled = true; $('#prMsg').textContent = 'Salvataggio…';
+      try { const j = await api('/pick', {code: PR.code, round: r.round, kind, picks: sel}); PR.me.picks = j.picks; $('#prMsg').textContent = '✓ Pronostico salvato'; const h = $('#pronHome'); if (h) h.innerHTML = pronHomeHTML(r); setTimeout(main, 900); }
+      catch (e) { $('#prMsg').textContent = e.message; $('#prSave').disabled = false; } }); };
+  (PR.code ? loadMe() : Promise.resolve(null)).then(me => me ? main() : profile());
+  api('/board').then(b => { const rows = b.players.map(p => { let tot = 0, n = 0; for (const [key, picks] of Object.entries(p.picks)) { const m = key.match(/^(\d+)([qr])$/); const s = m && scorePick(picks, actualTop3(+m[1], m[2])); if (s != null) { tot += s; n++; } } return {p, tot, n}; }).sort((a, b) => b.tot - a.tot);
+    const pb = $("#prBoard"); if (!pb) return; pb.innerHTML = rows.length ? rows.map((x, i) => `<div class="li"><div class="pos">${i + 1}</div><div class="grow"><b>${esc(x.p.nick)}</b>${PR.me && PR.me.id === x.p.id ? ' <span class="chip">tu</span>' : ''}<div class="small muted">${x.n} pronostici valutati · ${x.p.n} fatti</div></div><div class="pts">${x.tot}</div></div>`).join('') : '<div class="li muted">Ancora nessun giocatore.</div>'; })
+    .catch(() => { const pb = $("#prBoard"); if (pb) pb.innerHTML = '<div class="li muted">Classifica non disponibile.</div>'; });
+}
+
 /* ---------- griglie di partenza ufficiali con le minifig al posto delle foto ---------- */
 const GRIDIMG = {21: ['assets/grid_r21_1.jpg?v=1', 'assets/grid_r21_2.jpg?v=1']};
 document.addEventListener('click', e => { const b = e.target.closest('[data-grid]'); if (!b) return; const [rd, i] = b.dataset.grid.split(':'), r = F.races.find(x => x.round == rd);
@@ -680,7 +748,7 @@ function favCarousel(root, ids, start, onChange, onPick, kind = 'driver') {
     cv.width = LAYER.width = W; cv.height = LAYER.height = H; CW = Math.min(W * K.frac, H * .72 / K.aspect); CH = CW * K.aspect; R = CW * (K.aspect < 1 ? 1.36 : 1.42); TEX.clear(); REFL.clear(); draw(); }
   // --- animazione a scatto (pausa + giro con ease forte, come lo "step" della skill)
   function go(to, dur = 680) { cancelAnimationFrame(raf); const from = rot, t0 = performance.now();
-    const f = t => { const k = Math.min(1, (t - t0) / dur); rot = from + (to - from) * EASE(k); draw(); if (k < 1) raf = requestAnimationFrame(f); else { anim = null; onChange(ids[cur()]); } };
+    const f = t => { const k = Math.min(1, (t - t0) / dur); rot = from + (to - from) * EASE(k); draw(); if (k < 1) raf = requestAnimationFrame(f); else { anim = null; if (root.isConnected) onChange(ids[cur()]); } };
     anim = true; raf = requestAnimationFrame(f); }
   const snap = (dir = 0) => go((Math.round(-rot / STEP) + dir) * -STEP);
   const user = () => { lastUser = performance.now(); };
@@ -701,7 +769,7 @@ function favCarousel(root, ids, start, onChange, onPick, kind = 'driver') {
   idleT = setInterval(() => { if (!root.isConnected) return clearInterval(idleT); if (!anim && dragX === null && performance.now() - lastUser > 7000 && !document.hidden) snap(1); }, 2600);
   timers.push(idleT);
   const ro = new ResizeObserver(() => size()); ro.observe(root);
-  Promise.all(ids.map(figImg)).then(() => { TEX.clear(); REFL.clear(); size(); onChange(ids[cur()]); });
+  Promise.all(ids.map(figImg)).then(() => { if (!root.isConnected) return; TEX.clear(); REFL.clear(); size(); onChange(ids[cur()]); });
   size(); onChange(ids[cur()]);
   return {to: id => { const i = ids.indexOf(id); if (i >= 0) { const c = Math.round(-rot / STEP), d = mod(i - c + ids.length / 2, ids.length) - ids.length / 2; go((c + Math.round(d)) * -STEP); } }, refresh: () => { TEX.clear(); REFL.clear(); draw(); }};
 }

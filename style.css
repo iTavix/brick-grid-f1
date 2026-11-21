@@ -410,3 +410,25 @@ img{display:block;max-width:100%}
 a.li.news{text-decoration:none;color:inherit;align-items:flex-start}
 .ntitle{font-weight:600;font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .newsav{display:flex;align-items:center;justify-content:center;font-weight:900;font-style:italic;color:#fff;background:#E10600!important;font-size:14px;width:42px!important;height:42px!important}
+
+/* ---- pronostici ---- */
+.pronhome{background:linear-gradient(135deg,#1b1d24,#2a0c0b 120%);color:#fff}
+.pronrow{display:flex;align-items:center;gap:10px;padding:6px 0}
+.pronrow+.pronrow{border-top:1px solid rgba(255,255,255,.12)}
+.pronpicks{display:flex;gap:4px}
+.pronpicks .mini{font-size:12px;font-weight:800;padding:4px 7px;border-radius:8px;background:rgba(255,255,255,.14)}
+.prme{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+.prform{display:flex;gap:8px}
+.prform input{flex:1;min-width:0;font:inherit;font-size:16px;padding:12px 14px;border-radius:14px;border:0;background:var(--fill);color:var(--label);outline:none}
+.prslots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.prslot{background:var(--card);border-radius:18px;padding:10px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;border:2px solid transparent;min-height:118px;justify-content:center}
+.prslot .pos{position:absolute;top:6px;left:8px;width:auto;font-size:12px;color:var(--label2)}
+.prslot.p1{border-color:#E9B53B55}.prslot.p2{border-color:#A8B0BA55}.prslot.p3{border-color:#C9824A55}
+.prslot.ok{border-color:#34c759;background:color-mix(in srgb,#34c759 14%,var(--card))}
+.prslot.half{border-color:#E9B53B}.prslot.no{opacity:.6}
+.prslot b{font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prempty{width:52px;height:52px;border-radius:50%;border:2px dashed var(--label3);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--label3)}
+.prpool{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:6px;margin-top:12px}
+.prd{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border-radius:14px;background:var(--card);font-size:11px;font-weight:800;border:2px solid transparent}
+.prd.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--card))}
+.btn[disabled]{opacity:.45}
