@@ -354,3 +354,29 @@ img{display:block;max-width:100%}
 .champ{white-space:nowrap}
 .leader.is-champ{min-height:236px}
 .leader.is-champ .txt{gap:10px}
+
+/* ---- caschi nell'intestazione squadra ---- */
+.thelms{position:absolute;right:10px;top:46px;bottom:14px;width:46%;display:flex;align-items:center;justify-content:center;gap:2px}
+.thelm{position:relative;flex:1;max-width:120px;display:flex;flex-direction:column;align-items:center;color:#fff}
+.thelm img{width:100%;filter:drop-shadow(0 10px 12px rgba(0,0,0,.4));animation:spin 5s ease-in-out infinite;animation-delay:calc(var(--i)*-1.6s)}
+.thelm:nth-child(2){margin-top:34px}
+.thelm span{font-size:11px;font-weight:800;letter-spacing:.08em;margin-top:2px;padding:2px 8px;border-radius:999px;background:rgba(0,0,0,.28)}
+/* auto frontali in classifica */
+.carrow .carimg{width:112px;height:58px;background:var(--plate)}
+.carrow .carimg img{width:100%;height:100%;object-fit:contain}
+
+/* ---- carosello 3D del preferito ---- */
+.fcar{position:relative;height:350px;margin:6px -16px 0;border-radius:0;overflow:hidden;outline:none;
+  background:radial-gradient(70% 60% at 50% 38%,rgba(255,255,255,.10),transparent 70%),linear-gradient(180deg,var(--bg) 0%,color-mix(in srgb,var(--bg) 80%,#7a7a86) 72%,var(--bg) 100%)}
+.fcar canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y;cursor:grab}
+.fcar canvas:active{cursor:grabbing}
+.fc-prev,.fc-next{position:absolute;top:43%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;font-size:24px;line-height:1;color:var(--label);z-index:2}
+.fc-prev{left:12px}.fc-next{right:12px}
+.fcinfo{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
+.fcn{font-size:22px;line-height:1.15}
+.fcn b{font-weight:800}
+.fcinfo .btn{flex:none;padding:11px 14px;font-size:15px}
+.pick .pickstar{display:none}.pick.on .pickstar{display:block}
+@media(min-width:620px){.fcar{margin:6px 0 0;border-radius:var(--r);height:400px}}
+.fcar.teamring{height:300px}
+@media(min-width:620px){.fcar.teamring{height:340px}}

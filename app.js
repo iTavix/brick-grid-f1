@@ -109,7 +109,7 @@ function figFor(id) {
   return makeFig({suit: teamCol(c), suit2:'#15151a', helm: teamCol(c), helm2:'#fff', num:d.num, code:d.code, hair:'short', hairCol:'#1d1d1d'});
 }
 const avatar = id => `<div class="av">${figFor(id)}</div>`;
-const helmetFor = id => F.figs.includes(D[id].code) ? `assets/helmet_${D[id].code}.webp` : null;
+const helmetFor = id => F.figs.includes(D[id].code) ? `assets/helmet_${D[id].code}.webp?v=2` : null;
 
 /* ---------- stato utente ---------- */
 const store = {
@@ -206,7 +206,9 @@ function home() {
   setView(`
   <div class="ltitle"><div><p>${fmtDate(new Date(), {weekday:'long', day:'numeric', month:'long'})}</p><h1>F1 2026</h1></div><span class="badge red">Round ${done.length}/${F.races.length}</span></div>
 
-  ${stripHTML(carTeams)}
+  <div class="fcar teamring" id="teamCar"><canvas role="img" aria-label="Carosello delle squadre: scorri e tocca per aprire la squadra"></canvas>
+    <button class="fc-prev glass" aria-label="Squadra precedente">‹</button><button class="fc-next glass" aria-label="Squadra successiva">›</button></div>
+  <div class="fcinfo"><div id="tcName"></div><button class="btn sec" id="tcOpen">Apri squadra ›</button></div>
 
   <div class="sec-h"><h2>${CHAMP ? 'Campione 2026' : 'Leader del mondiale'}</h2>${CHAMP ? `<span class="small muted">titolo dal round ${CHAMP.round}</span>` : ''}</div>
   <div class="card leader tap ${CHAMP ? 'is-champ' : ''}" data-open="driver:${leader[0]}">
@@ -243,7 +245,12 @@ function home() {
   countUp($('#leadPts'), leader[1]);
   setTimeout(() => $('#homePod')?.firstElementChild?.classList.add('play'), 250);
   if (target) runCountdown('cdHome', target);
-  runStrip();
+  // carosello 3D delle 11 squadre, in ordine di classifica costruttori (gira da solo: pausa + scatto)
+  const tids = lastCStand.map(s => s[0]); let shownT = tids[0];
+  favCarousel($('#teamCar'), tids, 0, t => { shownT = t; const cs = lastCStand.find(s => s[0] === t), ds = lastStand.filter(s => s[4][s[4].length - 1] === t).slice(0, 2).map(s => D[s[0]].last).join(' · ');
+    $('#tcName').innerHTML = `<div class="small" style="color:${teamCol(t)};font-weight:800">P${cs[2]} costruttori${CCHAMP && CCHAMP.id === t ? ' · 🏆 campione' : ''}</div><div class="fcn"><b>${esc(teamName(t))}</b></div><div class="small muted">${nf(cs[1])} punti · ${esc(ds)}</div>`; },
+    t => open('team', t), 'team');
+  $('#tcOpen').onclick = () => open('team', shownT);
 }
 /* ---------- striscia animata a scene ---------- */
 const VIDEO360 = ['ferrari', 'red_bull', 'mclaren', 'mercedes', 'aston_martin', 'williams', 'alpine', 'haas', 'audi', 'cadillac'];
@@ -339,7 +346,7 @@ function standings() {
       <div class="small muted ellip">${CHAMP && CHAMP.id === s[0] ? '<b class="gold">🏆 Campione</b> · ' : ''}${esc(teamName(c))}${s[3] ? ` · ${s[3]} vittori${s[3] > 1 ? 'e' : 'a'}` : ''}</div>
       <div class="pbar"><i style="--w:${s[1] / maxD};background:${teamCol(c)}"></i></div></div><div class="pts">${nf(s[1])}</div></button>`; }).join('');
   const con = lastCStand.map((s, i) => `<button class="li carrow stag" style="--i:${i}" data-open="team:${s[0]}"><div class="pos">${s[2]}</div>
-      <div class="carimg"><img src="assets/side_${TM[s[0]].img}.webp" alt="" loading="lazy"></div>
+      <div class="carimg"><img src="assets/car_${TM[s[0]].img}.webp" alt="" loading="lazy"></div>
       <div class="grow"><div style="font-weight:700" class="ellip">${esc(teamName(s[0]))}</div><div class="small muted">${CCHAMP && CCHAMP.id === s[0] ? '<b class="gold">🏆 Campione</b> · ' : ''}${s[3] ? s[3] + ' vittorie' : 'nessuna vittoria'}</div>
       <div class="pbar"><i style="--w:${s[1] / maxC};background:${teamCol(s[0])}"></i></div></div><div class="pts">${nf(s[1])}</div></button>`).join('');
   setView(`<div class="ltitle"><div><p>Dopo ${done.length} GP</p><h1>Classifiche</h1></div></div>
@@ -477,8 +484,11 @@ function teamSheet(c) {
   const drivers = lastStand.filter(s => s[4][s[4].length - 1] === c);
   const wins = done.filter(r => r.results[0]?.c === c).length, pods = done.reduce((a, r) => a + r.results.slice(0, 3).filter(x => x.c === c).length, 0);
   const hist = F.cstand.map(st => (st.find(x => x[0] === c) || [0, 0])[1]); const max = Math.max(...hist, 1);
-  openSheet(`<div class="dhero" style="background:linear-gradient(160deg, ${m.col}, color-mix(in srgb, ${m.col} 35%, #000));min-height:180px"><div class="meta" style="max-width:100%">
-    ${CCHAMP && CCHAMP.id === c ? champBadge('Campione costruttori 2026') : ''}<div class="small" style="opacity:.85">P${cs[2]} costruttori · ${nf(cs[1])} punti</div><h2>${esc(m.n)}</h2></div></div>
+  const helms = drivers.map(s => s[0]).filter(id => helmetFor(id)).slice(0, 2);
+  openSheet(`<div class="dhero" style="background:linear-gradient(160deg, ${m.col}, color-mix(in srgb, ${m.col} 35%, #000));min-height:250px">
+    <div class="thelms">${helms.map((id, i) => `<button class="thelm" data-open="driver:${id}" style="--i:${i}"><img src="${helmetFor(id)}" alt="Casco ${esc(D[id].last)}"><span>${esc(D[id].code)}</span></button>`).join('')}</div>
+    <div class="meta" style="max-width:56%">
+    ${CCHAMP && CCHAMP.id === c ? champBadge('Campione costruttori') : ''}<div class="small" style="opacity:.85">P${cs[2]} costruttori · ${nf(cs[1])} punti</div><h2>${esc(m.n)}</h2></div></div>
     <div class="plate" style="margin-top:14px"><img src="assets/hero_${m.img}.webp" alt="Set LEGO ${esc(m.n)}"></div>
     ${m.set ? `<div class="list" style="margin-top:10px">
       <div class="li"><div class="grow"><b>LEGO® Speed Champions ${m.set.num}</b><div class="small muted">Auto da corsa F1® ${esc(m.set.name)}</div></div></div>
@@ -511,6 +521,112 @@ function teamSheet(c) {
   pv.addEventListener('animationend', () => pv.classList.remove('go'));
 }
 
+/* ---------- CAROSELLO 3D stile Apple (dalla skill apple-carousel, scena "media3d" museo) ----------
+   anello 3D di card, scatto con ease estrema [.85,0,.15,1], profondità di campo, riflesso sul pavimento.
+   Interattivo: swipe/trascina, frecce, tocco sulla card frontale = scegli. */
+function cbezier(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx, cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const X = t => ((ax * t + bx) * t + cx) * t, Y = t => ((ay * t + by) * t + cy) * t, dX = t => (3 * ax * t + 2 * bx) * t + cx;
+  return x => { if (x <= 0) return 0; if (x >= 1) return 1; let t = x;
+    for (let i = 0; i < 8; i++) { const d = dX(t); if (Math.abs(d) < 1e-6) break; t -= (X(t) - x) / d; }
+    if (t < 0 || t > 1 || Math.abs(X(t) - x) > 1e-4) { let a = 0, b = 1; t = x; for (let i = 0; i < 40; i++) { X(t) < x ? a = t : b = t; t = (a + b) / 2; } }
+    return Y(t); };
+}
+const loadImgP = src => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+/* pittori delle card: piloti (verticali, minifig) e squadre (orizzontali, auto 3/4 frontale) */
+const CARD = {
+  driver: {aspect: 1.38, frac: .44, src: id => F.figs.includes(D[id].code) ? `assets/fig_${D[id].code}.webp` : 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(figFor(id)),
+    paint(x, w, h, id, im) { const col = teamCol(teamOf(id));
+      const gr = x.createLinearGradient(0, 0, w * .4, h); gr.addColorStop(0, col); gr.addColorStop(1, '#0d0d10'); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+      const sp = x.createRadialGradient(w / 2, h * .62, 0, w / 2, h * .62, w * .7); sp.addColorStop(0, 'rgba(255,255,255,.28)'); sp.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = sp; x.fillRect(0, 0, w, h);
+      x.fillStyle = 'rgba(255,255,255,.14)'; x.font = `900 ${Math.round(h * .38)}px -apple-system,system-ui,Helvetica`; x.textAlign = 'right'; x.fillText(D[id].num || '', w * .96, h * .36);
+      if (im) { const fh = h * .7, fw = fh * im.width / im.height; x.drawImage(im, (w - fw) / 2, h * .84 - fh, fw, fh); }
+      x.fillStyle = 'rgba(0,0,0,.42)'; x.fillRect(0, h * .84, w, h * .16);
+      x.fillStyle = '#fff'; x.textAlign = 'left'; x.font = `800 ${Math.round(h * .062)}px -apple-system,system-ui,Helvetica`; x.fillText(D[id].last.toUpperCase(), w * .07, h * .935);
+      x.textAlign = 'right'; x.font = `700 ${Math.round(h * .05)}px -apple-system,system-ui,Helvetica`; x.fillStyle = 'rgba(255,255,255,.75)'; x.fillText('P' + (standOf(id)?.[2] ?? '–'), w * .93, h * .935);
+      if (ME.fav === id) { x.font = `${Math.round(h * .08)}px -apple-system`; x.textAlign = 'left'; x.fillText('⭐', w * .06, h * .1); } }},
+  team: {aspect: .74, frac: .62, src: t => `assets/car_${TM[t].img}.webp`,
+    paint(x, w, h, t, im) { const col = teamCol(t), cs = lastCStand.find(s => s[0] === t);
+      const gr = x.createLinearGradient(0, 0, w, h); gr.addColorStop(0, col); gr.addColorStop(1, '#0d0d10'); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+      const sp = x.createRadialGradient(w / 2, h * .62, 0, w / 2, h * .62, w * .55); sp.addColorStop(0, 'rgba(255,255,255,.55)'); sp.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = sp; x.fillRect(0, 0, w, h);
+      x.fillStyle = 'rgba(255,255,255,.16)'; x.font = `900 ${Math.round(h * .5)}px -apple-system,system-ui,Helvetica`; x.textAlign = 'right'; x.fillText(cs ? 'P' + cs[2] : '', w * .97, h * .44);
+      if (im) { const fw = w * .9, fh = fw * im.height / im.width; x.drawImage(im, (w - fw) / 2, h * .8 - fh, fw, fh); }
+      x.fillStyle = 'rgba(0,0,0,.45)'; x.fillRect(0, h * .8, w, h * .2);
+      x.fillStyle = '#fff'; x.textAlign = 'left'; x.font = `800 ${Math.round(h * .085)}px -apple-system,system-ui,Helvetica`; x.fillText(teamName(t).toUpperCase(), w * .05, h * .925);
+      x.textAlign = 'right'; x.font = `700 ${Math.round(h * .07)}px -apple-system,system-ui,Helvetica`; x.fillStyle = 'rgba(255,255,255,.8)'; x.fillText(cs ? nf(cs[1]) + ' pt' : '', w * .95, h * .925);
+      if (CCHAMP && CCHAMP.id === t) { x.font = `${Math.round(h * .11)}px -apple-system`; x.textAlign = 'left'; x.fillText('🏆', w * .04, h * .15); } }}
+};
+function favCarousel(root, ids, start, onChange, onPick, kind = 'driver') {
+  const K = CARD[kind];
+  const cv = root.querySelector('canvas'), g = cv.getContext('2d');
+  const N = 8, STEP = 360 / N, rad = d => d * Math.PI / 180, EASE = cbezier(.85, 0, .15, 1);
+  const LAYER = document.createElement('canvas'), LG = LAYER.getContext('2d');
+  const canBlur = 'filter' in g;
+  let W, H, DPR, CW, CH, R, rot = -start * STEP, anim = null, raf = 0, idleT = 0, lastUser = 0;
+  const TEX = new Map(), REFL = new Map(), FIG = new Map();
+  const mod = (a, n) => ((a % n) + n) % n;
+  const cur = () => mod(Math.round(-rot / STEP), ids.length);
+  // --- texture delle card (come paintCard della skill: card arrotondata + contenuto + didascalia)
+  async function figImg(id) { if (FIG.has(id)) return FIG.get(id); const im = await loadImgP(K.src(id)); FIG.set(id, im); return im; }
+  function tex(id) { if (TEX.has(id)) return TEX.get(id);
+    const c = document.createElement('canvas'); c.width = Math.round(CW); c.height = Math.round(CH); const x = c.getContext('2d'), w = c.width, h = c.height;
+    x.beginPath(); x.roundRect(0, 0, w, h, Math.min(w, h) * .09); x.clip();
+    K.paint(x, w, h, id, FIG.get(id));
+    TEX.set(id, c); return c; }
+  function refl(id) { if (REFL.has(id)) return REFL.get(id); const t = tex(id), c = document.createElement('canvas'); c.width = t.width; c.height = t.height; const x = c.getContext('2d');
+    x.translate(0, c.height); x.scale(1, -1); x.drawImage(t, 0, 0); x.setTransform(1, 0, 0, 1, 0, 0);
+    x.globalCompositeOperation = 'destination-in'; const gr = x.createLinearGradient(0, 0, 0, c.height * .55); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, c.width, c.height);
+    REFL.set(id, c); return c; }
+  // --- camera e proiezione (identiche alla skill)
+  const cam = () => { const p = rad(5), focal = 2.6 * W; return {cx: W / 2, cy: H * .40, c: Math.cos(p), s: Math.sin(p), focal, dist: focal + R}; };
+  const proj = (C, x, y, z) => { const y2 = y * C.c + z * C.s, z2 = z * C.c - y * C.s, d = C.dist - z2, k = C.focal / d; return {x: C.cx + x * k, y: C.cy + y2 * k, d, k}; };
+  function surface(ctx, C, t, xz, yTop, yBot, cols, a) { const tw = t.width, th = t.height, sw = tw / cols; let prev = null; ctx.globalAlpha = a;
+    for (let i = 0; i <= cols; i++) { const [x, z] = xz(i / cols), T = proj(C, x, yTop, z), B = proj(C, x, yBot, z);
+      if (prev) { const [pT, pB] = prev; ctx.setTransform((T.x - pT.x) / sw, (T.y - pT.y) / sw, (pB.x - pT.x) / th, (pB.y - pT.y) / th, pT.x, pT.y); ctx.drawImage(t, (i - 1) * sw, 0, sw, th, 0, 0, sw * 1.06 + .6, th); }
+      prev = [T, B]; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; }
+  function withBlur(b, fn) { if (!canBlur || b < .4) return fn(g); LG.setTransform(1, 0, 0, 1, 0, 0); LG.clearRect(0, 0, W, H); fn(LG); g.filter = `blur(${b.toFixed(1)}px)`; g.drawImage(LAYER, 0, 0); g.filter = 'none'; }
+  function draw() { if (!W || !CW) return;
+    g.clearRect(0, 0, W, H); const C = cam(), focusD = proj(C, 0, 0, R).d, c0 = -rot / STEP, cards = [];
+    for (let k = 0; k < N; k++) { const gi = k + N * Math.round((c0 - k) / N), id = ids[mod(gi, ids.length)];
+      const th = rad(k * STEP + rot), c = Math.cos(th), s = Math.sin(th);
+      const xz = u => { const uu = (u - .5) * CW; return [R * s + uu * c, R * c - uu * s]; };
+      cards.push({id, xz, d: proj(C, R * s, 0, R * c).d, facing: c}); }
+    cards.sort((a, b) => b.d - a.d);
+    const alpha = c => c.facing >= 0 ? 1 : .35, blur = c => 7 * DPR * Math.abs(c.d - focusD) / (2 * R);
+    for (const c of cards) withBlur(blur(c) + 2 * DPR, x => surface(x, C, refl(c.id), c.xz, CH / 2 + 4 * DPR, CH * 1.5 + 4 * DPR, 22, .3 * alpha(c)));
+    for (const c of cards) withBlur(blur(c), x => surface(x, C, tex(c.id), c.xz, -CH / 2, CH / 2, 22, alpha(c)));
+  }
+  function size() { if (!root.isConnected) { ro && ro.disconnect(); return; } if (!root.clientWidth) return; DPR = Math.min(2, devicePixelRatio || 1); W = Math.round(root.clientWidth * DPR); H = Math.round(root.clientHeight * DPR);
+    cv.width = LAYER.width = W; cv.height = LAYER.height = H; CW = Math.min(W * K.frac, H * .72 / K.aspect); CH = CW * K.aspect; R = CW * (K.aspect < 1 ? 1.36 : 1.42); TEX.clear(); REFL.clear(); draw(); }
+  // --- animazione a scatto (pausa + giro con ease forte, come lo "step" della skill)
+  function go(to, dur = 680) { cancelAnimationFrame(raf); const from = rot, t0 = performance.now();
+    const f = t => { const k = Math.min(1, (t - t0) / dur); rot = from + (to - from) * EASE(k); draw(); if (k < 1) raf = requestAnimationFrame(f); else { anim = null; onChange(ids[cur()]); } };
+    anim = true; raf = requestAnimationFrame(f); }
+  const snap = (dir = 0) => go((Math.round(-rot / STEP) + dir) * -STEP);
+  const user = () => { lastUser = performance.now(); };
+  // trascinamento
+  let dragX = null, dragRot = 0, moved = 0, vx = 0, lastX = 0, lastT = 0;
+  cv.addEventListener('pointerdown', e => { user(); cancelAnimationFrame(raf); dragX = e.clientX; dragRot = rot; moved = 0; vx = 0; lastX = e.clientX; lastT = performance.now(); cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => { if (dragX === null) return; const dx = e.clientX - dragX; moved = Math.max(moved, Math.abs(dx));
+    const now = performance.now(); vx = (e.clientX - lastX) / Math.max(1, now - lastT); lastX = e.clientX; lastT = now;
+    rot = dragRot + dx * DPR / CW * STEP * .9; draw(); });
+  const end = e => { if (dragX === null) return; dragX = null; user();
+    if (moved < 6) { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width; if (x > .3 && x < .7) { onPick(ids[cur()]); TEX.clear(); REFL.clear(); draw(); return; } return snap(x < .5 ? -1 : 1); }
+    const fling = Math.abs(vx) > .45 ? (vx > 0 ? 1 : -1) : 0; go((Math.round(-rot / STEP) - fling) * -STEP); };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  root.querySelector('.fc-prev').onclick = () => { user(); snap(-1); };
+  root.querySelector('.fc-next').onclick = () => { user(); snap(1); };
+  root.tabIndex = 0; root.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') { user(); snap(-1); } if (e.key === 'ArrowRight') { user(); snap(1); } if (e.key === 'Enter') onPick(ids[cur()]); });
+  // giro automatico quando nessuno tocca: pausa e scatto, come nel video
+  idleT = setInterval(() => { if (!root.isConnected) return clearInterval(idleT); if (!anim && dragX === null && performance.now() - lastUser > 7000 && !document.hidden) snap(1); }, 2600);
+  timers.push(idleT);
+  const ro = new ResizeObserver(() => size()); ro.observe(root);
+  Promise.all(ids.map(figImg)).then(() => { TEX.clear(); REFL.clear(); size(); onChange(ids[cur()]); });
+  size(); onChange(ids[cur()]);
+  return {to: id => { const i = ids.indexOf(id); if (i >= 0) { const c = Math.round(-rot / STEP), d = mod(i - c + ids.length / 2, ids.length) - ids.length / 2; go((c + Math.round(d)) * -STEP); } }, refresh: () => { TEX.clear(); REFL.clear(); draw(); }};
+}
+
 /* ---------- PILOTA PREFERITO ---------- */
 function lastResultOf(id) { for (let i = done.length - 1; i >= 0; i--) { const x = done[i].results.find(r => r.d === id); if (x) return [done[i], x]; } return null; }
 function favCard(id) {
@@ -527,14 +643,27 @@ function favCard(id) {
 function me() {
   const teams = lastCStand.map(c => c[0]);
   const byTeam = teams.map(t => [t, lastStand.filter(s => (s[4][s[4].length - 1]) === t).map(s => s[0])]);
-  setView(`<div class="ltitle"><div><p>Tra i piloti del mondiale 2026</p><h1>Preferito</h1></div>${ME.fav ? '<button class="badge" id="favClear">Rimuovi</button>' : ''}</div>
-    <div id="favTop">${favCard(ME.fav)}</div>
-    ${byTeam.map(([t, ids], k) => `<div class="sec-h"><h2 style="font-size:18px"><span class="tdot" style="background:${teamCol(t)}"></span>${esc(teamName(t))}</h2></div>
-      <div class="pickgrid">${ids.map((id, i) => `<button class="pick stag ${ME.fav === id ? 'on' : ''}" style="--i:${k * 2 + i};--c:${teamCol(t)}" data-pick="${id}">
-        <div class="pickfig">${figFor(id)}</div><div class="pickname"><b>${esc(D[id].last)}</b><span>#${esc(D[id].num || '')} · P${standOf(id)?.[2] ?? '–'}</span></div>${ME.fav === id ? '<i class="pickstar">★</i>' : ''}</button>`).join('')}</div>`).join('')}
+  const ids = lastStand.map(s => s[0]), start = Math.max(0, ids.indexOf(ME.fav));
+  setView(`<div class="ltitle"><div><p>Scorri e scegli tra i ${ids.length} piloti del 2026</p><h1>Preferito</h1></div><button class="badge" id="favClear" ${ME.fav ? '' : 'hidden'}>Rimuovi</button></div>
+    <div class="fcar" id="fcar"><canvas role="img" aria-label="Carosello dei piloti: scorri per sceglierne uno"></canvas>
+      <button class="fc-prev glass" aria-label="Pilota precedente">‹</button><button class="fc-next glass" aria-label="Pilota successivo">›</button></div>
+    <div class="fcinfo"><div id="fcName"></div><button class="btn" id="fcPick"></button></div>
+    <div class="sec-h"><h2>Il tuo preferito</h2></div><div id="favTop">${favCard(ME.fav)}</div>
+    <div class="sec-h"><h2>Tutti i piloti</h2><span class="small muted">per squadra</span></div>
+    ${byTeam.map(([t, list], k) => `<div class="sec-h" style="margin-top:14px"><h2 style="font-size:17px"><span class="tdot" style="background:${teamCol(t)}"></span>${esc(teamName(t))}</h2></div>
+      <div class="pickgrid">${list.map((id, i) => `<button class="pick ${ME.fav === id ? 'on' : ''}" style="--c:${teamCol(t)}" data-pick="${id}">
+        <div class="pickfig">${figFor(id)}</div><div class="pickname"><b>${esc(D[id].last)}</b><span>#${esc(D[id].num || '')} · P${standOf(id)?.[2] ?? '–'}</span></div><i class="pickstar">★</i></button>`).join('')}</div>`).join('')}
     <p class="foot">Il preferito resta salvato su questo dispositivo, compare nella Home ed è evidenziato con ⭐ in classifica.</p>`, 'Preferito');
-  document.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { ME.fav = ME.fav === b.dataset.pick ? null : b.dataset.pick; saveMe(); go('me'); });
-  $('#favClear') && ($('#favClear').onclick = () => { ME.fav = null; saveMe(); go('me'); });
+  let shown = ids[start];
+  const info = id => { shown = id; const st = standOf(id), c = teamOf(id), isFav = ME.fav === id;
+    $('#fcName').innerHTML = `<div class="small" style="color:${teamCol(c)};font-weight:700">${esc(teamName(c))} · #${esc(D[id].num || '')}</div><div class="fcn">${esc(D[id].first)} <b>${esc(D[id].last)}</b></div><div class="small muted">P${st ? st[2] : '–'} · ${nf(STAT[id].pts)} punti${CHAMP && CHAMP.id === id ? ' · 🏆 campione' : ''}</div>`;
+    const b = $('#fcPick'); b.textContent = isFav ? '★ Il tuo preferito' : '⭐ Scegli come preferito'; b.classList.toggle('sec', isFav); };
+  const pick = id => { ME.fav = id; saveMe(); $('#favTop').innerHTML = favCard(id); $('#favClear').hidden = false;
+    document.querySelectorAll('[data-pick]').forEach(b => b.classList.toggle('on', b.dataset.pick === id)); car.refresh(); info(shown); };
+  const car = favCarousel($('#fcar'), ids, start, info, pick);
+  $('#fcPick').onclick = () => pick(shown);
+  document.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { pick(b.dataset.pick); car.to(b.dataset.pick); $('#fcar').scrollIntoView({behavior: 'smooth', block: 'center'}); });
+  $('#favClear').onclick = () => { ME.fav = null; saveMe(); $('#favTop').innerHTML = favCard(null); $('#favClear').hidden = true; document.querySelectorAll('[data-pick]').forEach(b => b.classList.remove('on')); car.refresh(); info(shown); };
 }
 
 /* ---------- avvio ---------- */
