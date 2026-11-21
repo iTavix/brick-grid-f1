@@ -380,3 +380,33 @@ img{display:block;max-width:100%}
 @media(min-width:620px){.fcar{margin:6px 0 0;border-radius:var(--r);height:400px}}
 .fcar.teamring{height:300px}
 @media(min-width:620px){.fcar.teamring{height:340px}}
+
+/* ---- mappe circuiti e qualifiche del prossimo GP ---- */
+.trackmap{width:100%;height:auto;display:block}
+.trackmap .tm-dash{animation:tmdash 2.4s linear infinite}
+@keyframes tmdash{to{stroke-dashoffset:-48}}
+.nextgp{overflow:hidden}
+.nxmap{position:absolute;right:-18px;top:-14px;width:150px;opacity:.5;pointer-events:none}
+.nxq{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.14)}
+.nxq3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.nxqd{display:flex;align-items:center;gap:6px;font-size:13px;min-width:0}
+.nxqd b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nxqd>div:last-child{min-width:0}
+.trackcard{padding:14px;background:radial-gradient(90% 80% at 50% 40%,#2a2f3a,#14161c)}
+.trackcard .trackmap{max-width:420px;margin:0 auto}
+.nxq3{grid-template-columns:1fr;gap:6px}
+.nxqd{justify-content:flex-start}
+.nxqd>div:last-child{display:flex;flex:1;justify-content:space-between;align-items:baseline;gap:8px}
+.nxqd b{font-size:15px}
+
+/* ---- griglia di partenza (immagini) ---- */
+.gridimgs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gridimg{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:4/5}
+.gridimg img{width:100%;height:100%;object-fit:cover;object-position:top}
+.gridimg span{position:absolute;left:8px;bottom:8px;font-size:12px;font-weight:800;color:#fff;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.gridfull{width:100%;border-radius:18px;margin-top:14px;display:block}
+
+/* ---- news ---- */
+a.li.news{text-decoration:none;color:inherit;align-items:flex-start}
+.ntitle{font-weight:600;font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.newsav{display:flex;align-items:center;justify-content:center;font-weight:900;font-style:italic;color:#fff;background:#E10600!important;font-size:14px;width:42px!important;height:42px!important}

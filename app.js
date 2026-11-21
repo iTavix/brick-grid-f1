@@ -192,7 +192,7 @@ function globeSVG(lat, lng) {
   <circle cx="60" cy="60" r="${R}" fill="url(#gg)"/><path d="${p}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width=".7"/>
   <circle cx="60" cy="60" r="5" fill="#E10600" stroke="#fff" stroke-width="2"/><circle cx="60" cy="60" r="5" fill="none" stroke="#E10600" stroke-width="2"><animate attributeName="r" values="5;18" dur="1.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0" dur="1.8s" repeatCount="indefinite"/></circle></svg>`;
 }
-const posTxt = x => /^\d+$/.test(x.pt) ? x.pt : ({R:'RIT',D:'SQ',W:'NP',N:'NC',E:'ESC',F:'NQ'}[x.pt] || x.pt);
+const posTxt = x => x.pt == null ? String(x.p) : /^\d+$/.test(x.pt) ? x.pt : ({R:'RIT',D:'SQ',W:'NP',N:'NC',E:'ESC',F:'NQ'}[x.pt] || x.pt);
 const statusIt = s => s === 'Finished' ? '' : s === 'Lapped' ? 'Doppiato' : /^\+\d+ Laps?$/.test(s) ? s.replace('Laps','giri').replace('Lap','giro') : s === 'Retired' ? 'Ritirato' : s === 'Disqualified' ? 'Squalificato' : s === 'Did not start' ? 'Non partito' : s;
 
 /* ---------- HOME ---------- */
@@ -227,11 +227,18 @@ function home() {
   </div>` : ''}
 
   ${nextRace ? `<div class="sec-h"><h2>Prossimo GP</h2><button data-open="track:${nextRace.round}">Dettagli</button></div>
-  <div class="card pad tap" data-open="track:${nextRace.round}" style="color:#fff;background:linear-gradient(135deg,#1b1d24,#3a0d0c 120%)">
-    <div class="row"><div class="flag">${gpFlag(nextRace)}</div><div class="grow"><div class="rnd" style="color:rgba(255,255,255,.7)">Round ${nextRace.round} · ${esc(nextRace.locality)}</div><div style="font-weight:800;font-size:21px">${gpName(nextRace)}</div>
+  <div class="card pad tap nextgp" data-open="track:${nextRace.round}" style="color:#fff;background:linear-gradient(135deg,#1b1d24,#3a0d0c 120%)">
+    <div class="nxmap">${trackMap(nextRace.circuitId, 'nx')}</div>
+    <div class="row" style="position:relative"><div class="flag">${gpFlag(nextRace)}</div><div class="grow"><div class="rnd" style="color:rgba(255,255,255,.7)">Round ${nextRace.round} · ${esc(nextRace.locality)}</div><div style="font-weight:800;font-size:21px">${gpName(nextRace)}</div>
     <div class="small" style="opacity:.8">Gara: ${fmtDate(target, {weekday:'long', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit'})} (ora italiana)</div></div></div>
     ${countdownHTML('cdHome')}
-  </div>` : ''}
+    <div id="nextQuali"></div>
+  </div>
+  ${GRIDIMG[nextRace.round] ? `<div class="sec-h"><h2>Griglia di partenza</h2><span class="small muted">tocca per ingrandire</span></div>
+  <div class="gridimgs">${GRIDIMG[nextRace.round].map((src, i) => `<button class="gridimg tap" data-grid="${nextRace.round}:${i}"><img src="${src}" alt="Griglia di partenza ${gpName(nextRace)}, posizioni ${i ? '11–22' : '1–10'}" loading="lazy"><span>${i ? '11 – 22' : '1 – 10'}</span></button>`).join('')}</div>` : ''}` : ''}
+
+  <div class="sec-h"><h2>News F1</h2><button id="newsAll">Tutte</button></div>
+  <div class="list" id="newsHome">${newsList(newsItems().slice(0, 5))}</div>
 
   <div class="sec-h"><h2>Piloti del giorno</h2><span class="small muted">voto dei fan · ${done.filter(r => r.dotd).length} GP</span></div>
   <div class="hscroll">${dotdTop.map(([id, n], i) => `<button class="card hcard tap" data-open="driver:${id}"><img src="${helmetFor(id) || ''}" alt="Casco ${esc(D[id].last)}" style="animation-delay:-${i * .7}s"><b>${esc(D[id].last)}</b><div class="small muted">${n} ${n > 1 ? 'volte' : 'volta'}</div></button>`).join('')}</div>
@@ -245,6 +252,9 @@ function home() {
   countUp($('#leadPts'), leader[1]);
   setTimeout(() => $('#homePod')?.firstElementChild?.classList.add('play'), 250);
   if (target) runCountdown('cdHome', target);
+  if (nextRace) liveQuali(nextRace).then(q => { const el = $('#nextQuali'); if (el && q && q.length) el.innerHTML = qualiTop3(q); });
+  $('#newsAll').onclick = newsSheet;
+  liveNews().then(ok => { const el = $('#newsHome'); if (ok && el) el.innerHTML = newsList(newsItems().slice(0, 5)); });
   // carosello 3D delle 11 squadre, in ordine di classifica costruttori (gira da solo: pausa + scatto)
   const tids = lastCStand.map(s => s[0]); let shownT = tids[0];
   favCarousel($('#teamCar'), tids, 0, t => { shownT = t; const cs = lastCStand.find(s => s[0] === t), ds = lastStand.filter(s => s[4][s[4].length - 1] === t).slice(0, 2).map(s => D[s[0]].last).join(' · ');
@@ -421,8 +431,11 @@ function trackSheet(round) {
   openSheet(`<div class="dhero" style="background:radial-gradient(120% 90% at 80% 20%,#26324a,#0c0f16);min-height:250px;align-items:center">
     <div class="meta"><div class="small" style="opacity:.75">${gpFlag(r)} Round ${r.round} · ${weekendRange(r)}</div><h2>${esc(r.circuit)}</h2><div class="first">${gpName(r)}</div>
     <div class="small" style="opacity:.75;margin-top:6px">${esc(r.locality)}, ${esc(gpCountry(r))}</div></div>
-    <div style="position:absolute;right:18px;top:60px">${globeSVG(r.lat, r.lng)}</div></div>
+    <div style="position:absolute;right:14px;top:56px">${globeSVG(r.lat, r.lng)}</div></div>
     ${isNext ? `<div class="card pad" style="margin-top:14px;color:#fff;background:linear-gradient(135deg,#E10600,#7a0300)"><b>Alla partenza mancano</b>${countdownHTML('cdTrack')}</div>` : ''}
+    ${CIRC[r.circuitId] ? `<div class="sec-h"><h2>Il tracciato</h2><span class="small muted">${r.turns} curve · ${km(r.len)} km</span></div>
+      <div class="card trackcard">${trackMap(r.circuitId, 'tk')}</div>` : ''}
+    ${!w ? `<div id="liveQuali"></div>` : ''}
     <div class="stats">
       <div class="stat"><span>Lunghezza</span><b>${km(r.len)}</b><span>km</span></div>
       <div class="stat"><span>Curve</span><b>${r.turns}</b><span>totali</span></div>
@@ -442,6 +455,72 @@ function trackSheet(round) {
       </div>` : ''}
     <p style="margin-top:18px"><a class="mapbtn" href="${maps}" target="_blank" rel="noopener">📍 Apri il circuito in Mappe</a></p>`);
   if (isNext) runCountdown('cdTrack', when(r.date, r.time));
+  if (!w) liveQuali(r).then(q => { const el = $('#liveQuali'); if (el && q && q.length) el.innerHTML = `<div class="sec-h"><h2>Qualifiche</h2><span class="small muted">ordine dei tempi</span></div>${resTable(q, "q")}<p class="small muted" style="margin:8px 4px 0">La griglia di partenza può cambiare per penalità.</p>`; });
+}
+
+/* ---------- NEWS: copia statica (news.js, aggiornata dall'attività del lunedì) + feed dal vivo tramite il Worker ---------- */
+const API = window.BG_API || '';
+let NEWS = (window.NEWS && window.NEWS.items) || [];
+async function liveNews() { if (!API) return false;
+  try { const j = await (await fetch(API + '/news')).json(); if (!j.items || !j.items.length) return false;
+    const seen = new Set(NEWS.map(n => n.l)); NEWS = j.items.filter(n => !seen.has(n.l)).concat(NEWS).sort((a, b) => b.d - a.d); return true; } catch { return false; } }
+const newsItems = () => NEWS;
+const NAMEIDX = () => F.drivers.map(d => [d.id, d.last.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()]).filter(x => x[1].length > 3);
+function newsWho(t) { const s = t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); const m = NAMEIDX().find(([, n]) => new RegExp('\\b' + n + '\\b').test(s)); return m ? m[0] : null; }
+function ago(ms) { const m = Math.round((Date.now() - ms) / 60000); if (m < 60) return m + ' min fa'; const h = Math.round(m / 60); if (h < 24) return h + ' h fa'; return fmtDate(new Date(ms), {day: 'numeric', month: 'short'}); }
+function newsList(items) {
+  if (!items.length) return '<div class="li"><div class="grow muted">Nessuna notizia disponibile.</div></div>';
+  return items.map(n => { const who = newsWho(n.t);
+    return `<a class="li news" href="${esc(n.l)}" target="_blank" rel="noopener">${who ? avatar(who).replace('class="av"', 'class="av" style="width:42px;height:42px"') : '<div class="av newsav">F1</div>'}
+      <div class="grow"><div class="small muted">${esc(n.s)} · ${ago(n.d)}</div><div class="ntitle">${esc(n.t.replace(/^F1 \| /, ''))}</div></div></a>`; }).join('');
+}
+function newsSheet() {
+  // raggruppa per weekend di gara: ogni notizia va nella settimana del GP più recente prima della sua data
+  const groups = new Map();
+  for (const n of NEWS) { const r = [...F.races].reverse().find(x => when(x.date, x.time) - 3 * 86400e3 <= n.d) || F.races[0];
+    if (!groups.has(r.round)) groups.set(r.round, {r, items: []}); groups.get(r.round).items.push(n); }
+  openSheet(`<div class="dhero" style="background:linear-gradient(160deg,#1b1d24,#3a0d0c);min-height:150px"><div class="meta" style="max-width:100%"><div class="small" style="opacity:.75">${NEWS.length} notizie · aggiornate ${NEWS[0] ? ago(NEWS[0].d) : ''}</div><h2>News F1</h2></div></div>
+    ${[...groups.values()].map(g => `<div class="sec-h"><h2 style="font-size:18px">${gpFlag(g.r)} Settimana del ${gpName(g.r)}</h2><span class="small muted">${g.items.length}</span></div><div class="list">${newsList(g.items)}</div>`).join('')}
+    <p class="foot">Titoli e link da Motorsport.com, FormulaPassion e Formula1.com: tocca una notizia per leggerla sul sito della fonte.</p>`);
+}
+
+/* ---------- griglie di partenza ufficiali con le minifig al posto delle foto ---------- */
+const GRIDIMG = {21: ['assets/grid_r21_1.jpg?v=1', 'assets/grid_r21_2.jpg?v=1']};
+document.addEventListener('click', e => { const b = e.target.closest('[data-grid]'); if (!b) return; const [rd, i] = b.dataset.grid.split(':'), r = F.races.find(x => x.round == rd);
+  openSheet(`<div class="dhero" style="background:linear-gradient(160deg,#2a0606,#0b0b0e);min-height:150px"><div class="meta" style="max-width:100%"><div class="small" style="opacity:.75">${gpFlag(r)} Round ${r.round}</div><h2>Griglia di partenza</h2><div class="first">${gpName(r)}</div></div></div>
+    ${GRIDIMG[rd].map((src, k) => `<img class="gridfull" id="gf${k}" src="${src}" alt="Griglia di partenza, posizioni ${k ? '11–22' : '1–10'}">`).join('')}
+    <p class="foot">Grafica ufficiale F1 con le minifig LEGO® al posto delle foto dei piloti. Camara non ha una minifig: è rappresentato con una figura generica nei colori Haas.</p>`);
+  setTimeout(() => $('#gf' + i)?.scrollIntoView({block: 'start'}), 300); });
+
+/* ---------- mappe dei circuiti (github.com/bacinger/f1-circuits, MIT) ---------- */
+const CIRC = window.CIRCUITS || {};
+function trackMap(cid, uid) {
+  const c = CIRC[cid]; if (!c) return '';
+  const id = 'tp-' + uid + '-' + cid;
+  return `<svg class="trackmap" viewBox="-6 -6 112 112" role="img" aria-label="Tracciato ${esc(c.name)}">
+    <path id="${id}" d="${c.d}" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="6.5" stroke-linejoin="round" transform="translate(.8 1.2)"/>
+    <path d="${c.d}" fill="none" stroke="#3a3d45" stroke-width="5" stroke-linejoin="round"/>
+    <path d="${c.d}" fill="none" stroke="#f5f5f7" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="${c.d}" fill="none" stroke="#E10600" stroke-width="1.6" stroke-linejoin="round" stroke-dasharray="1.6 3.2" class="tm-dash"/>
+    <circle r="2.6" fill="#E10600" stroke="#fff" stroke-width="1"><animateMotion dur="9s" repeatCount="indefinite" rotate="auto"><mpath href="#${id}"/></animateMotion></circle>
+    <g transform="translate(${c.d.slice(1).split('L')[0].split(' ').map(Number).join(' ')})"><rect x="-2.6" y="-2.6" width="5.2" height="5.2" fill="#fff"/><rect x="-2.6" y="-2.6" width="2.6" height="2.6" fill="#111"/><rect x="0" y="0" width="2.6" height="2.6" fill="#111"/></g>
+  </svg>`;
+}
+/* qualifiche del prossimo GP: lette dal vivo dall'API Jolpica appena disponibili */
+const LIVEQ = {};
+async function liveQuali(r) {
+  if (r.quali.length) return r.quali; if (LIVEQ[r.round]) return LIVEQ[r.round];
+  const s = r.sessions.Qualifying; if (!s || when(s[0], s[1]) > Date.now()) return null;
+  try { const j = await (await fetch(`https://api.jolpi.ca/ergast/f1/2026/${r.round}/qualifying/`)).json();
+    const q = (j.MRData.RaceTable.Races[0] || {}).QualifyingResults || [];
+    q.forEach(x => { const d = x.Driver; if (!D[d.driverId]) { D[d.driverId] = {id: d.driverId, code: d.code, num: d.permanentNumber, first: d.givenName, last: d.familyName, nat: d.nationality}; STAT[d.driverId] = {wins: 0, pod: 0, poles: 0, fl: 0, dnf: 0, starts: 0, best: 99, dotd: 0, sprintW: 0, pts: 0}; } });
+    return (LIVEQ[r.round] = q.map(x => ({p: +x.position, d: x.Driver.driverId, c: x.Constructor.constructorId, q1: x.Q1, q2: x.Q2, q3: x.Q3})));
+  } catch { return null; }
+}
+function qualiTop3(q) {
+  return `<div class="nxq"><div class="small" style="opacity:.8;font-weight:700;letter-spacing:.04em;text-transform:uppercase">Qualifiche · tempi</div>
+    <div class="nxq3">${q.slice(0, 3).map(x => `<div class="nxqd"><div class="wf" style="width:44px;height:44px">${F.figs.includes(D[x.d].code) ? `<img src="assets/fig_${D[x.d].code}.webp" alt="">` : figFor(x.d)}</div>
+      <div><b>P${x.p} ${esc(D[x.d].last)}</b><div class="small" style="opacity:.75">${esc(x.q3 || x.q2 || x.q1 || '')}</div></div></div>`).join('')}</div></div>`;
 }
 
 /* ---------- PILOTA ---------- */
